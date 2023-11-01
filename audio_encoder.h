@@ -1,6 +1,7 @@
 #ifndef AUDIOENCODER_H
 #define AUDIOENCODER_H
 
+#include <vector>
 #include "util.h"
 
 class AudioEncoder

@@ -14,6 +14,7 @@ Pusher::~Pusher()
 bool Pusher::Init(const Properties& properties)
 {
     avdevice_register_all();
+    av_log_set_level(AV_LOG_DEBUG);
 
     ShowDevices();
 

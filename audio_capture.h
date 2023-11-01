@@ -2,6 +2,8 @@
 #define AUDIOCAPTURE_H
 
 #include <thread>
+#include <functional>
+#include <atomic>
 #include "util.h"
 #include "av_publish_time.h"
 #include "resampler.h"
@@ -36,6 +38,8 @@ private:
     std::atomic<bool> exit_ = true;
     std::thread looper_;
     FILE* pcm_flt_fp_ = NULL;
+
+    AVFrame* capture_frame_ = NULL;
 
     Resampler resampler_;
 };

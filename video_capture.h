@@ -2,6 +2,8 @@
 #define VIDEOCAPTURE_H
 
 #include <thread>
+#include <atomic>
+#include <functional>
 #include "util.h"
 #include "av_publish_time.h"
 
@@ -40,6 +42,7 @@ private:
      * 对于音频的AVFrame也一样，只不过没有遇到崩溃，暂时没有修改
     */
     AVFrame* convert_frame_ = NULL;
+    AVFrame* capture_frame_ = NULL;
 
     std::atomic<bool> exit_ = true;
     std::thread looper_;

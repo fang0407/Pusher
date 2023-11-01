@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 class Properties: public std::map<std::string, std::string>
 {

@@ -1,29 +1,41 @@
 #include "util.h"
+#include <thread>
+#include <chrono>
+#include <qglobal.h>
 
 #define ERROR_STRING_SIZE 2048
 
 bool ShowDevices()
 {
     int ret = 0;
+    const char* device_name = NULL;
     AVFormatContext* fmt_ctx = avformat_alloc_context();
     AVDictionary* opt = nullptr;
     AVInputFormat *in_fmt = nullptr;
     ret = av_dict_set(&opt, "list_devices", "true", 0);
     if (ret < 0) {
-        std::cout << "av_dict_set field list_devices failed" << std::endl;
+        DEBUG("av_dict_set field list_devices failed");
         goto failed;
     }
 
-    in_fmt = (AVInputFormat*)av_find_input_format("avfoundation");
+#ifdef Q_OS_WIN
+    device_name = "dshow";
+#endif
+
+#ifdef Q_OS_MAC
+    device_name = "avfoundation";
+#endif
+
+    in_fmt = (AVInputFormat*)av_find_input_format(device_name);
     if (!in_fmt) {
-        std::cout << "av_find_input_format failed" << std::endl;
+        DEBUG("av_find_input_format failed");
         goto failed;
     }
 
     //list_devices == true时,第二个参数无效
-    std::cout << "======Show Devices INFO======" << std::endl;
+    DEBUG("======Show Devices INFO======");
     avformat_open_input(&fmt_ctx, NULL, in_fmt, &opt);
-    std::cout << "======Show Devices INFO======" << std::endl;
+    DEBUG("======Show Devices INFO======");
 
     avformat_close_input(&fmt_ctx);
     return true;

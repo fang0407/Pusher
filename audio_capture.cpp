@@ -1,5 +1,7 @@
 #include "audio_capture.h"
 #include <iostream>
+#include <memory>
+#include <qglobal.h>
 
 AudioCapture::AudioCapture()
 {
@@ -25,6 +27,9 @@ AudioCapture::~AudioCapture()
     if (pcm_flt_fp_)
         fclose(pcm_flt_fp_);
 
+    if (capture_frame_)
+        av_frame_free(&capture_frame_);
+
     DEBUG("~AudioCapture() finish");
 }
 
@@ -41,19 +46,34 @@ bool AudioCapture::Init()
     }
 
     AVDictionary* opt = nullptr;
+    AVInputFormat *in_fmt = nullptr;
+    const char* url = nullptr;
+
+#ifdef Q_OS_MAC
     ret = av_dict_set(&opt, "audio_device_index", "0", 0);
     if (ret < 0) {
         DEBUG("av_dict_set field audio_device_index failed");
         return false;
     }
 
-    AVInputFormat *in_fmt = (AVInputFormat*)av_find_input_format("avfoundation");
+    in_fmt = (AVInputFormat*)av_find_input_format("avfoundation");
     if (!in_fmt) {
         DEBUG("av_find_input_format failed");
         return false;
     }
+#endif
 
-    ret = avformat_open_input(&fmt_ctx_, NULL, in_fmt, &opt);
+#ifdef Q_OS_WIN
+    url = "audio=virtual-audio-capturer";
+
+    in_fmt = (AVInputFormat*)av_find_input_format("dshow");
+    if (!in_fmt) {
+        DEBUG("av_find_input_format failed");
+        return false;
+    }
+#endif
+
+    ret = avformat_open_input(&fmt_ctx_, url, in_fmt, &opt);
     if (ret < 0) {
         DEBUG("avformat_open_input failed");
         return false;
@@ -85,15 +105,24 @@ bool AudioCapture::Init()
         return false;
     }
 
+    //dshow not set channel_layout
+    if (codec_ctx_->channel_layout == 0) {
+        codec_ctx_->channel_layout = av_get_default_channel_layout(codec_ctx_->channels);
+    }
+
+    capture_frame_ = av_frame_alloc();
+    if (!capture_frame_) {
+        DEBUG("audio capture frame alloc failed");
+        return false;
+    }
+
     //resampler
-    resampler_.Init(codec_ctx_->channel_layout,
+    return resampler_.Init(codec_ctx_->channel_layout,
                     codec_ctx_->sample_fmt,
                     codec_ctx_->sample_rate,
                     av_get_default_channel_layout(convert_channels_),
                     (enum AVSampleFormat)convert_sample_fmt_,
                     convert_sample_rate_);
-
-    return true;
 }
 
 bool AudioCapture::Run()
@@ -125,7 +154,6 @@ void AudioCapture::Loop()
 
     int ret = -1;
     AVPacket pkt;
-    AVFrame frame;
     AVPublishTime& timer = AVPublishTime::GetInstance();
     int64_t pts = 0;
 
@@ -145,12 +173,12 @@ void AudioCapture::Loop()
             }
 
             while (ret == 0) {
-                ret = avcodec_receive_frame(codec_ctx_, &frame);
+                ret = avcodec_receive_frame(codec_ctx_, capture_frame_);
                 if (ret == 0) {
 
-                    frame.pts = pts;
-                    resampler_.SendFrame(&frame);
-                    pts += frame.nb_samples;
+                    capture_frame_->pts = pts;
+                    resampler_.SendFrame(capture_frame_);
+                    pts += capture_frame_->nb_samples;
 
                     AVFrame* convert_frame = resampler_.RecvFrame(convert_nb_samples_);
                     std::shared_ptr<AVFrame> convert_frame_ptr(convert_frame, [](AVFrame* convert_frame){

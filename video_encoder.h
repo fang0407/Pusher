@@ -2,6 +2,7 @@
 #define VIDEOENCODER_H
 
 #include "util.h"
+#include <vector>
 
 class VideoEncoder
 {

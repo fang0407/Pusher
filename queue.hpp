@@ -3,6 +3,7 @@
 
 #include <list>
 #include <mutex>
+#include <functional>
 #include <condition_variable>
 
 namespace gcm {

@@ -42,6 +42,18 @@ mac {
     LIBS += -L/usr/local/lib -lavcodec -lavdevice -lavfilter -lavformat -lavutil -lpostproc -lswscale -lswresample
 }
 
+win64 {
+    INCLUDEPATH += $$PWD/ffmpeg_install/include
+    LIBS += $$PWD/ffmpeg_install/lib/avformat.lib \
+    $$PWD/ffmpeg_install/lib/avcodec.lib \
+    $$PWD/ffmpeg_install/lib/avdevice.lib \
+    $$PWD/ffmpeg_install/lib/avfilter.lib \
+    $$PWD/ffmpeg_install/lib/avutil.lib \
+    $$PWD/ffmpeg_install/lib/swresample.lib \
+    $$PWD/ffmpeg_install/lib/postproc.lib \
+    $$PWD/ffmpeg_install/lib/swscale.lib
+}
+
 FORMS += \
     mainwindow.ui
 

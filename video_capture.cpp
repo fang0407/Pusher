@@ -1,5 +1,7 @@
 #include "video_capture.h"
+#include <cstdio>
 #include <iostream>
+#include <qglobal.h>
 
 
 VideoCapture::VideoCapture()
@@ -29,6 +31,10 @@ VideoCapture::~VideoCapture()
         av_frame_free(&convert_frame_);
     }
 
+    if (capture_frame_) {
+        av_frame_free(&capture_frame_);
+    }
+
     DEBUG("~VideoCapture() finish");
 }
 
@@ -45,25 +51,44 @@ bool VideoCapture::Init()
     }
 
     AVDictionary* opt = nullptr;
+    AVInputFormat *in_fmt = nullptr;
+    const char* url = nullptr;
+#ifdef Q_OS_MAC
     ret = av_dict_set(&opt, "video_device_index", "0", 0);
     if (ret < 0) {
-        DEBUG("av_dict_set field list_devices failed");
+        DEBUG("av_dict_set field video_device_index failed");
         return false;
     }
 
     ret = av_dict_set(&opt, "framerate", "30", 0);
     if (ret < 0) {
-        DEBUG("av_dict_set field list_devices failed");
+        DEBUG("av_dict_set field framerate failed");
         return false;
     }
 
-    AVInputFormat *in_fmt = (AVInputFormat*)av_find_input_format("avfoundation");
+    in_fmt = (AVInputFormat*)av_find_input_format("avfoundation");
     if (!in_fmt) {
         DEBUG("av_find_input_format failed");
         return false;
     }
+#endif
 
-    ret = avformat_open_input(&fmt_ctx_, NULL, in_fmt, &opt);
+#ifdef Q_OS_WIN
+    url = "video=screen-capture-recorder";
+    ret = av_dict_set(&opt, "framerate", "25", 0);
+    if (ret < 0) {
+        DEBUG("av_dict_set field framerate failed");
+        return false;
+    }
+
+    in_fmt = (AVInputFormat*)av_find_input_format("dshow");
+    if (!in_fmt) {
+        DEBUG("av_find_input_format failed");
+        return false;
+    }
+#endif
+
+    ret = avformat_open_input(&fmt_ctx_, url, in_fmt, &opt);
     if (ret < 0) {
         DEBUG("avformat_open_input failed");
         return false;
@@ -107,12 +132,23 @@ bool VideoCapture::Init()
 
     //alloc frame
     convert_frame_ = av_frame_alloc();
+    if (!convert_frame_) {
+        DEBUG("convert frame alloc failed");
+        return false;
+    }
+
     convert_frame_->width = convert_width_;
     convert_frame_->height = convert_height_;
     convert_frame_->format = convert_pix_fmt_;
     ret = av_frame_get_buffer(convert_frame_, 0);
     if (ret < 0) {
         DEBUG("av_frame_get_buffer failed");
+        return false;
+    }
+
+    capture_frame_ = av_frame_alloc();
+    if (!capture_frame_) {
+        DEBUG("capture frame alloc failed");
         return false;
     }
 
@@ -153,7 +189,6 @@ void VideoCapture::Loop()
 
     int ret = -1;
     AVPacket pkt;
-    AVFrame frame;
     AVPublishTime& timer = AVPublishTime::GetInstance();
 
     while (!exit_) {
@@ -172,12 +207,12 @@ void VideoCapture::Loop()
             }
 
             while (ret == 0) {
-                ret = avcodec_receive_frame(codec_ctx_, &frame);
+                ret = avcodec_receive_frame(codec_ctx_, capture_frame_);
                 if (ret == 0) {
 
                     sws_scale(img_convert_ctx_,
-                          (const uint8_t* const*)frame.data,
-                          frame.linesize, 0, codec_ctx_->height,
+                              (const uint8_t* const*)capture_frame_->data,
+                              capture_frame_->linesize, 0, codec_ctx_->height,
                               convert_frame_->data, convert_frame_->linesize);
 
                     //set pts
